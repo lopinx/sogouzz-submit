@@ -1,0 +1,19 @@
+{
+    "websites": [
+        {
+            "username": "lopins",
+            "password": "lk=Ls:+8>)?!ap/D",
+            "sitemap": "https://bug.wenyix.cn/sitemap.xml"
+        },
+        {
+            "username": "lopins",
+            "password": "lk=Ls:+8>)?!ap/D",
+            "sitemap": "https://www.kundabc.com/sitemap.xml"  
+        }
+    ],
+    "backend": "https://zhanzhang.sogou.com/",
+    "captcha": 10,
+    "headless": true,
+    "cdpserver": "wss://cloud.lightpanda.io/ws?token=5341furiqax9ltwz0bp2ecogvsnykmdh687j7okg2fnq1fsat8qk7x31gog98kps",
+    "engine": "msedge"
+}
