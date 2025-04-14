@@ -335,11 +335,22 @@ async def main(site: dict) -> bool:
             # 分批处理链接
             batch_size = 20
             for batch_index, start in enumerate(range(0, len(urls_list), batch_size)):
-                current_batch = urls_list[start:start + batch_size]
-                if not await submit(page, current_batch, site, OCR, batch_index):
-                    print(f"❌ 批次 {batch_index + 1} 提交失败")
+                _batch = urls_list[start:start + batch_size]
+                _bTag = False
+                for attempt in range(config.get('captcha', 3)):
+                    try:
+                        if await submit(page, _batch, site, OCR, batch_index):
+                            # print(f"✅ 【第 {batch_index + 1} 批 - 第 {attempt + 1} 次】 提交成功")
+                            _bTag = True
+                            break
+                        await page.wait_for_timeout(500)
+                    except Exception as e:
+                        # print(f"⚠️ 【第 {batch_index + 1} 批 - 第 {attempt + 1} 次】 尝试")
+                        await page.wait_for_timeout(500)
+                        continue
+                if not _bTag:
+                    # print(f"⚠️ 【第 {batch_index + 1} 批】 所有尝试均失败，继续处理下一批")
                     continue
-                await page.wait_for_timeout(500)
             return True
     except Exception as e:
         print(f"❌ 发生错误：{str(e)}")
