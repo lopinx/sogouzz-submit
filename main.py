@@ -32,7 +32,7 @@ __author__ = "https://github.com/lopinx"
 ```
 """
 # =================================================================================================
-# (项目新建)安装依赖：uv add playwright ddddocr
+# (项目新建)安装依赖：uv add playwright ddddocr pyjson5
 # (项目重建)同步依赖：uv sync 
 # =================================================================================================
 # playwright 浏览器自动化框架
@@ -65,7 +65,7 @@ sudo yum install -y libappindicator-gtk3 liberation-fonts \
 # 5. 运行程序：uv run python main.py
 # =================================================================================================
 import asyncio
-import json
+import pyjson5 as json
 import re
 # import time
 import urllib.request
