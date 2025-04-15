@@ -2,7 +2,9 @@
 __author__ = "https://github.com/lopinx"
 # =================================================================================================
 # 添加调试模式启动： 
-# "Google Chrome": 必须先结束已存在的Chrome浏览器进程后再开启， chrome.exe --remote-debugging-port=39222
+# "Google Chrome": 必须先结束已存在的Chrome浏览器进程后再开启， 
+# 固定端口：chrome.exe --remote-debugging-port=39222
+# 动态端口：chrome.exe --remote-debugging-port=0
 #  启动 -> 访问"http://localhost:39222/json/version" -> 获取以下JSON数据中的"webSocketDebuggerUrl"
 """
 ``` json
@@ -16,7 +18,9 @@ __author__ = "https://github.com/lopinx"
 }
 ```
 """
-# "Microsoft Edge": 必须先结束已存在的Edge浏览器进程后再开启， msedge.exe --remote-debugging-port=39333
+# "Microsoft Edge": 必须先结束已存在的Edge浏览器进程后再开启
+# 固定端口：msedge.exe --remote-debugging-port=39333
+# 动态端口：msedge.exe --remote-debugging-port=0
 #  启动 -> 访问"http://localhost:39333/json/version" -> 获取以下JSON数据中的"webSocketDebuggerUrl"
 # https://learn.microsoft.com/zh-cn/microsoft-edge/devtools-protocol-chromium/
 """
@@ -68,15 +72,19 @@ sudo yum install -y libappindicator-gtk3 liberation-fonts \
 import asyncio
 import random
 import re
+import psutil
 from pathlib import Path
 from urllib.error import URLError,HTTPError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
+# from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 import websockets
 import ddddocr
 import pyjson5 as json
 from playwright.async_api import async_playwright
+# import threading
+# from typing import Optional
 
 OCR = ddddocr.DdddOcr(show_ad=False)
 WorkDIR = Path(__file__).resolve().parent
@@ -84,20 +92,36 @@ WorkDIR = Path(__file__).resolve().parent
 _env = WorkDIR / ('dev.json' if (WorkDIR / 'dev.json').exists() else 'config.json')
 config = json.load(_env.open('r', encoding='utf-8'))
 
-
-async def cdplink(start=1024, end=49151) -> str | None:
+async def wslink() -> str:
     """获取本地webSocketDebuggerUrl"""
-    for port in range(start, end + 1):
+    urls = []
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        if name := proc.info['name'].lower():
+            # 进程名称过滤（Chrome/Edge/Chromium）
+            if not re.match(r'^(chrome|edge|msedge|chromium)(\.exe)?$', name, re.IGNORECASE) and len(name) > 1:
+                continue
         try:
-            with urlopen(f"http://localhost:{port}/json/version", timeout=3) as response:
-                if response.getcode() == 200:
-                    data = json.loads(response.read())
-                    if 'webSocketDebuggerUrl' in data:
-                        print(f"✅ 找到可用的CDP端口: {port}")
-                        return data['webSocketDebuggerUrl']
-        except (URLError, HTTPError):
+            cmdline = ' '.join(proc.info['cmdline'] or []).lower()
+            if '--remote-debugging-port=' not in cmdline:
+                continue
+            port_match = re.search(r'--remote-debugging-port=(\d+)', cmdline)
+            if not port_match:
+                continue
+            port = int(port_match.group(1))
+            if port == 0:
+                for conn in proc.net_connections():
+                    if conn.status == 'LISTEN' and 1024 <= (port := conn.laddr.port) <= 65535:
+                        break
+            try:
+                req = Request(f"http://localhost:{port}/json/version", headers={'User-Agent': 'Mozilla/5.0'})
+                with urlopen(req, timeout=1) as r:
+                    if ws := json.loads(r.read().decode()).get('webSocketDebuggerUrl'):
+                        urls.append(ws)
+            except (URLError, HTTPError, ValueError, TimeoutError, TypeError):
+                continue      
+        except (psutil.Error, AttributeError, ValueError, KeyError):
             continue
-    return None
+    return list(set(urls))
 
 async def captcha(page: str, captcha_selector: str, input_selector: str, OCR: any) -> None:
     """处理验证码的通用函数"""
@@ -267,7 +291,7 @@ async def main(site: dict) -> bool:
     try:
         urls_list = await urls(site['sitemap'])
         if not urls_list:
-            print("❌ 未能从提供的源获取URL")
+            # print("❌ 未能从提供的源获取URL")
             return False
         
         _cps = []
@@ -280,13 +304,12 @@ async def main(site: dict) -> bool:
 
         urls_list = [url for idx, url in enumerate(urls_list) if idx not in _cps]
         if not urls_list:
-            print("❌ 所有URL均已处理，退出程序")
+            # print("❌ 所有URL均已处理，退出程序")
             return False
         print(f"🔍 共有 {len(urls_list)} 个URL待处理")
     except URLError as e:
         print(f"❌ 无法获取: {str(e)}")
         return False
-    
     try:
         async with async_playwright() as playwright:
             # 浏览器的参数
@@ -339,18 +362,20 @@ async def main(site: dict) -> bool:
             }
             
             # 筛选可用WS链接
-            ws_list = []
-            for _wsl in config.get("cdpserver"):
-                try:
-                    async with websockets.connect(_wsl, timeout=2):
-                        ws_list.append(_wsl)
-                except:
-                    pass
-            if not ws_list and (_cdplink := await cdplink()):
-                ws_list.append(_cdplink)
-            
-            if ws_list:
-                _ws = random.choice(ws_list)
+            # Try config CDP servers first, then fallback to local browser detection
+            ws_link = []
+            if cdp := config.get("cdpserver"):
+                for url in cdp:
+                    try:
+                        async with websockets.connect(url, open_timeout=5) as ws:
+                            await ws.ping()
+                            await ws.close()
+                            ws_link.append(url)
+                    except: 
+                        continue
+            else:
+                ws_link.extend(await wslink())
+            _ws = random.choice(ws_link) if ws_link else None
 
             # 连接到浏览器
             if _ws and config.get('headless', False):
@@ -358,17 +383,16 @@ async def main(site: dict) -> bool:
                     browser = await playwright.chromium.connect_over_cdp(
                         _ws, 
                         timeout=180000,
-                        slow_mo=500,
-                        headers={'User-Agent': _UserAgent}
+                        slow_mo=500
                     )
                 except Exception as e:
                     print(f"❌ 无法连接到CDP服务器: {str(e)}")
                     return False
                 
                 try:
-                    context = await browser.contexts[0]
+                    context = browser.contexts[0]
                     page = context.pages[0] if context.pages else await context.new_page()
-                except (IndexError, Exception) as e:
+                except (IndexError, TypeError, Exception) as e:
                     if any(_ in _ws for _ in ('chrome', 'msedge')):
                         context = await browser.new_context(**_cargs)
                     else:
@@ -410,6 +434,10 @@ async def main(site: dict) -> bool:
             
             # 测试反反爬虫
             await page.goto('https://res.cdn.issem.cn', wait_until='networkidle', timeout=180000)
+            try:
+                print(f"{await page.evaluate('() => navigator.userAgent')}")
+            except Exception as e:
+                print(f"❌ 无法获取浏览器用户代理: {str(e)}")
             
             # 登录站长平台
             await page.goto(config.get("backend"), wait_until='networkidle', timeout=180000)
@@ -432,11 +460,11 @@ async def main(site: dict) -> bool:
                     print(f"🔍 正在处理第 {_index + 1} 批，包含 {len(_batch)} 个URL")
                     for _ in range(config.get('captcha', 3)):
                         try:
-                            print(f"🎯 第 {_+1} 次尝试提交...")
+                            # print(f"🎯 第 {_+1} 次尝试提交...")
                             if await submit(page, _batch, site, OCR, _index):
                                 _bTag = True
                                 batch.add(_index)
-                                print(f"✅ 第 {_index + 1} 批处理成功，当前完成 {len(batch)}/{batches} 批")
+                                # print(f"✅ 第 {_index + 1} 批处理成功，当前完成 {len(batch)}/{batches} 批")
                                 # 将已完成批次的URL追加保存到日志文件
                                 with open(WorkDIR / f'{urlparse(site['sitemap']).netloc}.log', 'a+') as f:
                                     for url in _batch:
