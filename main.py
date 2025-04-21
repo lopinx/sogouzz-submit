@@ -89,8 +89,10 @@ import pyjson5 as json
 import websockets
 from playwright.async_api import async_playwright
 
-
-OCR = ddddocr.DdddOcr(show_ad=False)
+# =================================================================================================
+OCR = ddddocr.DdddOcr(show_ad=False, beta=True)
+OCR.set_ranges("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-x/=*") # 识别范围
+# =================================================================================================
 WorkDIR = Path(__file__).resolve().parent
 # 读取配置文件dev.json,config.json分别为开发和生产环境
 _env = WorkDIR / ('dev.json' if (WorkDIR / 'dev.json').exists() else 'config.json')
@@ -103,6 +105,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+# =================================================================================================
 
 async def wslink() -> List[str]:
     """获取本地调试链接"""
@@ -129,9 +132,9 @@ async def wslink() -> List[str]:
                 with urlopen(req, timeout=1) as r:
                     if ws := json.loads(r.read().decode()).get('webSocketDebuggerUrl'):
                         urls.append(ws)
-            except (URLError, HTTPError, ValueError, TimeoutError, TypeError):
-                continue      
-        except (psutil.Error, AttributeError, ValueError, KeyError):
+            except:
+                continue
+        except:
             continue
     return list(set(urls))
 
@@ -144,7 +147,7 @@ async def captcha(page: str, captcha_selector: str, input_selector: str, OCR: an
         await page.fill(input_selector, captcha_code)
         await page.wait_for_timeout(1000)
     else:
-        logging.warning("❌ 验证码元素未找到，可能是页面加载不完全或验证码元素不存在。")
+        logging.warning("❌ 验证码元素未找到，页面可能未完全加载")
 
 async def login(page: str, site: dict, OCR: any) -> bool:
     """处理登录逻辑"""
@@ -300,7 +303,7 @@ async def main(site: dict) -> bool:
     try:
         urls_list = await urls(site['sitemap'])
         if not urls_list:
-            logging.error("❌ 未能从提供的源获取URL")
+            logging.error("❌ 未能从您提供的Sitemap地址获取到URL")
             return False
         
         _cps = []
@@ -313,10 +316,10 @@ async def main(site: dict) -> bool:
 
         urls_list = [url for idx, url in enumerate(urls_list) if idx not in _cps]
         if not urls_list:
-            logging.error("❌ 所有URL均已处理，退出程序")
+            logging.error("❌ 所有URL均已处理完毕且没有新的URL地址")
             return False
     except URLError as e:
-        logging.error(f"❌ 无法获取: {str(e)}")
+        logging.error(f"❌ 网络错误，无法获取: {str(e)}")
         return False
     try:
         async with async_playwright() as playwright:
@@ -363,7 +366,7 @@ async def main(site: dict) -> bool:
                     slow_mo=500
                 )
             except Exception as e:
-                logging.error(f"❌ 无法连接到CDP服务器: {str(e)}")
+                logging.error(f"❌ 无法连接到CDP服务: {str(e)}")
                 return False
             
             try:
