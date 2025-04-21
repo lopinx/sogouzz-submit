@@ -53,6 +53,7 @@ __author__ = "https://github.com/lopinx"
 # 2. 安装依赖：uv sync
 # [CDP模式不需要]3. 安装驱动：uv run python -m playwright install chromium
 # 4. 运行程序：uv run python main.py
+# 5. 打包EXE：uv run pyinstaller main.spec
 # =================================================================================================
 ```
 
@@ -99,10 +100,25 @@ SAST v0.1.0
     ],
     "backend": "https://zhanzhang.sogou.com/",
     "captcha": 10,
-    "cdpserver": "wss://cloud.lightpanda.io/ws?token=5341furiqax9ltwz0bp2ecogvsnykmdh687j7okg2fnq1fsat8qk7x31gog98kps",
+    "cdpserver": ["wss://cloud.lightpanda.io/ws?token=5341furiqax9ltwz0bp2ecogvsnykmdh687j7okg2fnq1fsat8qk7x31gog98kps"],
     "readme": "配置文件简洁易懂！captcha为验证码最大尝试次数，headless为true时是CDP服务器模式，headless为false时是launch实例模式！",
 }
 ```
+
+### 快速上手
+
+
+- 1. 安装并启动 Lightpanda 服务或者本地开启Debugger模式（Win+R）： 
+
+`msedge.exe --headless --remote-debugging-port=39333`
+
+- 2. 安装依赖：`uv sync`
+
+- **CDP模式不需要**3. 安装驱动：`uv run python -m playwright install chromium`
+
+- 4. 运行程序：`uv run python main.py`
+
+- 5. 打包EXE：`uv run pyinstaller main.spec`
 
 ### CDP服务器：
 
