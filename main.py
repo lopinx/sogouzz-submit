@@ -69,7 +69,9 @@ sudo yum install -y libappindicator-gtk3 liberation-fonts \
 # 2. 安装依赖：uv sync
 # [CDP模式不需要]3. 安装驱动：uv run python -m playwright install chromium
 # 4. 运行程序：uv run python main.py
+# 5. 打包EXE：uv run pyinstaller main.spec
 # =================================================================================================
+import argparse
 import asyncio
 import logging
 import random
@@ -80,22 +82,19 @@ from typing import List
 from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
-# from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 import ddddocr
 import psutil
 import pyjson5 as json
 import websockets
 from playwright.async_api import async_playwright
+# from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 # =================================================================================================
 OCR = ddddocr.DdddOcr(show_ad=False, beta=True)
 OCR.set_ranges("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-x/=*") # 识别范围
 # =================================================================================================
 WorkDIR = Path(__file__).resolve().parent
-# 读取配置文件dev.json,config.json分别为开发和生产环境
-_env = WorkDIR / ('dev.json' if (WorkDIR / 'dev.json').exists() else 'config.json')
-config = json.load(_env.open('r', encoding='utf-8'))
 # 日志记录配置
 logging.basicConfig(
     level=logging.INFO,
@@ -104,10 +103,27 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
+logging.info(f"🚀 启动程序 {__author__}")
+# 读取配置文件dev.json,config.json分别为开发和生产环境
+parser = argparse.ArgumentParser(description="配置文件参数")
+parser.add_argument(
+    "conf",
+    type=str,
+    help="指定配置文件路径（如：config.json，默认使用当前目录的 config.json）",
+    nargs='?',  # 允许不传入参数
+    default= 'dev.json' if (WorkDIR / 'dev.json').exists() else 'config.json'
+)
+args = parser.parse_args()
+if not (conf := Path(WorkDIR) / args.conf).exists():
+    raise FileNotFoundError(f"配置文件 {conf} 不存在！")
+with conf.open('r', encoding='utf-8') as f:
+    config = json.load(f)
+logging.info(f"🥰 配置文件 {conf} 加载成功！")
 # =================================================================================================
 
 async def wslink() -> List[str]:
     """获取本地调试链接"""
+    logging.info(f"🥰 开始遍历本地已开启调试模式的浏览器！")
     urls = []
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         if name := proc.info['name'].lower():
@@ -187,6 +203,7 @@ async def login(page: str, site: dict, OCR: any) -> bool:
 
 async def urls(sitemap: str) -> list:
     """从sitemap中获取URL列表"""
+    # logging.info(f"💪 正在奋力爬取网站地图哦！")
     _links, urls = "", []
     for attempt in range(config.get('captcha', 3)):
         try:
@@ -205,6 +222,7 @@ async def urls(sitemap: str) -> list:
                 mapurls = re.findall(r'<loc>\s*(.*?)\s*</loc>', _links)
                 urls = []
                 for su in mapurls:
+                    logging.info(f"💪 开始爬取网站地图：{su}")
                     try:
                         with urlopen(su) as resp:
                             _sublinks = resp.read().decode('utf-8')
@@ -212,20 +230,24 @@ async def urls(sitemap: str) -> list:
                     except URLError:
                         continue
             else:
+                logging.info(f"💪 开始爬取网站地图：{sitemap}")
                 urls = re.findall(r'<loc>\s*(.*?)\s*</loc>', _links)
         elif '<rss' in _links or '<feed' in _links:
+            logging.info(f"💪 开始爬取网站地图：{sitemap}")
             urls = re.findall(r'<link>\s*(https?://.*?)\s*</link>', _links)
             if not urls:
                 urls.extend(re.findall(r'<link[^>]+href="(https?://[^"]+)"', _links))
                 urls.extend(re.findall(r'<link[^>]+rel="alternate"[^>]+href="(https?://[^"]+)"', _links))
     else:
         if '<!DOCTYPE html' in _links[:100] or '<html' in _links[:100]:
+            logging.info(f"💪 开始爬取网站地图：{sitemap}")
             _baseUrl = urlparse(sitemap).scheme + '://' + urlparse(sitemap).netloc
             urls = re.findall(r'<a\s+href=["\'](https?://[^"\']+)["\']', _links, re.IGNORECASE)
             # 补全相对链接并且过滤非本域名的链接
             urls = [urljoin(_baseUrl, url) if not urlparse(url).netloc else url for url in urls]
             urls = [url for url in urls if urlparse(url).netloc == urlparse(_baseUrl).netloc]
         else:
+            logging.info(f"💪 开始爬取网站地图：{sitemap}")
             urls = [url.strip() for url in _links.splitlines() if url.strip()]
     # 剔除首页链接
     urls = list(dict.fromkeys(url for url in urls if not url.endswith('/') and not urlparse(url).path == ''))
@@ -263,11 +285,14 @@ async def submit(page: str, _batch: list, site: dict, OCR: any, _index: int) -> 
     if not _box:
         logging.error(f"❌ 无法找到元素，可能是页面加载不完全或元素不存在。")
         return False
-
-    await page.wait_for_timeout(1000)
-    await page.fill('//input[contains(@type,"text") and @class="search_input"]', domain)
-    await page.wait_for_timeout(1000)
-    await page.click(f"//li[contains(@class, 'select_item') and normalize-space()='{domain}']")
+    try:
+        await page.wait_for_timeout(1000)
+        await page.fill('//input[contains(@type,"text") and @class="search_input"]', domain)
+        await page.wait_for_timeout(1000)
+        await page.click(f"//li[contains(@class, 'select_item') and normalize-space()='{domain}']")
+    except Exception as e:
+        logging.error(f"❌ 没有找到您的域名，请确认您拥有该站点权限!!!")
+        return False
     await page.wait_for_timeout(1000)
     await page.fill('//div[@class="form-control"]//textarea', '\n'.join(_batch))
     await page.wait_for_timeout(1000)
@@ -311,7 +336,7 @@ async def main(site: dict) -> bool:
                 lines = f.read().splitlines()
                 _cps = [int(line.strip()) for line in lines if line.strip().isdigit()]
         except FileNotFoundError:
-            logging.warning("⚠️ 日志文件不存在，将重新处理所有URL")
+            logging.warning("⚠️  日志文件不存在，将重新处理所有URL")
 
         urls_list = [url for idx, url in enumerate(urls_list) if idx not in _cps]
         if not urls_list:
@@ -410,7 +435,7 @@ async def main(site: dict) -> bool:
                             await page.wait_for_timeout(1000)
                             continue 
                     if not _bTag:
-                        logging.warning(f"⚠️ 第 {_index + 1} 批所有尝试均失败，将在下次循环重试")
+                        logging.warning(f"⚠️  第 {_index + 1} 批所有尝试均失败，将在下次循环重试")
                 if len(batch) < batches:
                     logging.warning(f"⏳ 批次处理未完成：{len(batch)}/{batches}，准备开始新一轮重试...")
             return True
@@ -426,12 +451,14 @@ async def main(site: dict) -> bool:
             if 'browser' in locals() and browser and browser.is_connected():
                 await browser.close()
         except Exception as e:
-            logging.error(f"⚠️ 清理资源时出错：{str(e)}")
+            logging.error(f"⚠️  清理资源时出错：{str(e)}")
 
 
 if __name__ == "__main__":
-    while True:
-        for site in config.get("websites"):
-            if not site or not isinstance(site, dict):
-                continue
-            logging.info(asyncio.run(main(site)))
+    # _env = WorkDIR / ('dev.json' if (WorkDIR / 'dev.json').exists() else 'config.json')
+    # config = json.load(_env.open('r', encoding='utf-8'))
+    # while True:
+    for site in config.get("websites"):
+        if not site or not isinstance(site, dict):
+            continue
+        asyncio.run(main(site))
