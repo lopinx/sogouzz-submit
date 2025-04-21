@@ -49,11 +49,10 @@ __author__ = "https://github.com/lopinx"
 # browser = p.webkit.launch(headless=False)
 # =================================================================================================
 # 运行前步骤：
-# 1. 安装并启动 Lightpanda 服务(CentOS)：
-# 2. 升级setuptools：uv pip install setuptools -U
-# 3. 安装依赖：uv sync
-# 4. 安装驱动：uv run python -m playwright install chromium
-# 5. 运行程序：uv run python main.py
+# 1. 安装并启动 Lightpanda 服务(CentOS)或者本地开启Debugger模式（Win+R）： `msedge.exe --headless --remote-debugging-port=39333`
+# 2. 安装依赖：uv sync
+# [CDP模式不需要]3. 安装驱动：uv run python -m playwright install chromium
+# 4. 运行程序：uv run python main.py
 # =================================================================================================
 ```
 
