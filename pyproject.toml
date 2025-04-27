@@ -3,8 +3,8 @@ url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
 default = true
 
 [project]
-name = "SAST"
-version = "0.1.0"
+name = "sogouzz-submit"
+version = "1.1.0"
 description = "搜狗站长链接自动化提交"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,3 +15,6 @@ dependencies = [
     "pyjson5>=1.6.8",
     "websockets>=15.0.1",
 ]
+
+[dependency-groups]
+dev = []

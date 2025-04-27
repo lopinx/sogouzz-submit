@@ -14,12 +14,10 @@
     ],
     "backend": "https://zhanzhang.sogou.com/",  // 站长平台地址
     "captcha": 10,        // 验证码识别次数
-    // 是否使用无头模式，true表示使用无头模式，false表示使用有头模式
+    // 调试模式/远程模式的ws链接
     "cdpserver": [
-        "wss://cloud.lightpanda.io/ws?token=5341furiqax9ltwz0bp2ecogvsnykmdh687j7okg2fnq1fsat8qk7x31gog98kps"
-        // "wss://cloud.lightpanda.io/ws?browser=lightpanda&proxy=datacenter&country=cn&token=5341furiqax9ltwz0bp2ecogvsnykmdh687j7okg2fnq1fsat8qk7x31gog98kps",
         "ws://localhost:39222/devtools/browser/e3a6cde2-3c19-4019-a5fb-40ff8f0a00cb",
         "ws://localhost:39333/devtools/browser/38695a1e-23c1-4a92-bab6-f2728f89b31d"
     ],
-    "readme": "配置文件简洁易懂！captcha为验证码最大尝试次数，headless为true时是CDP服务器模式，headless为false时是launch实例模式！",
+    "readme": "配置文件简洁易懂！captcha为验证码最大尝试次数,cdpserver是开启调试模式的浏览器Debugger链接,可以为空，配置文件为JSON格式或者JSON5格式！"
 }
