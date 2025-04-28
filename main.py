@@ -102,10 +102,7 @@ OCR = ddddocr.DdddOcr(show_ad=False, beta=True)
 OCR.set_ranges("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") # 识别范围
 # =================================================================================================
 # 确定工作目录（处理打包后的路径）
-if getattr(sys, 'frozen', False):
-    WorkDIR = Path(sys.executable).parent
-else:
-    WorkDIR = Path.cwd()
+WorkDIR = Path(__file__).resolve().parent
 # 日志记录配置
 logging.basicConfig(
     level=logging.INFO,
