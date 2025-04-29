@@ -425,24 +425,9 @@ async def main(site: Dict) -> bool:
 
     try:
         async with async_playwright() as playwright:
-            # 浏览器的参数
-            _cargs = {
-                "viewport": {"width": 1440, "height": 900},     # 设置浏览器窗口大小
-                "screen": {"width": 1920, "height": 1080},      # 设置屏幕分辨率
-                "ignore_https_errors": True,                    # 忽略https错误
-                "java_script_enabled": True,                    # 启用JavaScript
-                "locale": "zh-CN",                              # 设置语言环境
-                "timezone_id": "Asia/Shanghai",                 # 设置时区
-                # "geolocation": {"longitude": 116.40387, "latitude": 39.91435, "accuracy": 100},   # 设置地理位置
-                "permissions": ["notifications"],               # 设置权限: 通知
-                "bypass_csp": True,                             # 绕过 CSP（Content Security Policy）
-                "accept_downloads": True,                       # 允许下载
-                "user_agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
-            }
-
             # 筛选可用WS链接
             ws_link = await wslink()
-            print(f"正在使用CDP服务：{ws_link}")
+            logging.info(f"⏳ 正在使用CDP服务：{ws_link}")
             if ws_link:
                 _ws = random.choice(ws_link)
             else:
@@ -465,7 +450,7 @@ async def main(site: Dict) -> bool:
                 context = await browser.new_context()
             page: Page = await context.new_page()
 
-            # print(f"""正在启动浏览器...（{config.get('backend')}）""")
+            # print(f"""⏳ 正在启动浏览器...（{config.get('backend')}）""")
             # 测试反反爬虫
             # await page.goto('https://res.cdn.issem.cn', wait_until="networkidle", timeout=18000000)
             
